@@ -1,0 +1,15 @@
+query Documents {
+  resourceQuery: resources {
+    ...Resource
+  }
+}
+
+fragment Resource on resources {
+  id
+  updated_at
+  created_at
+  documentName
+  documentNumber
+  s3_key
+  thumbnail_s3_key
+}
