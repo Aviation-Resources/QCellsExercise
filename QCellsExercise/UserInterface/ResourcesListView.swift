@@ -28,7 +28,9 @@ struct ResourcesListView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass: UserInterfaceSizeClass?
 
 
-    @Bindable var model: ResourcesFilterModel = ResourcesFilterModel()
+    @Bindable fileprivate var model: ResourcesListViewModel = ResourcesListViewModel()
+    @State private var selectedPDFDestination: ResourcePDFDestination?
+    @State private var isPDFPresented = false
     
     let compactColumns: [GridItem] = [GridItem()]
     let regularColumns: [GridItem] = [GridItem(), GridItem(), GridItem(), GridItem()]
@@ -69,12 +71,23 @@ struct ResourcesListView: View {
             #endif
         }.task {
             await model.loadSourceData(networkingController: graphQLNetworking)
+        }.navigationDestination(isPresented: $isPDFPresented) {
+            if let selectedPDFDestination {
+                selectedPDFDestination.pdfKitView.navigationTitle(selectedPDFDestination.navigationTitle)
+            }
         }
     }
     
     var content: some View {
         ForEach(model.filteredResources) { resource in
-            ResourceView(services: self.servicesNetworking, resource: resource).padding()
+            ResourceView(services: self.servicesNetworking, resource: resource) { pdfKitView, navigationTitle in
+                selectedPDFDestination = ResourcePDFDestination(pdfKitView: pdfKitView, navigationTitle: navigationTitle)
+                isPDFPresented = true
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(.secondary.opacity(0.25), lineWidth: 1)
+            }
         }
     }
     
@@ -102,14 +115,13 @@ struct ResourcesListView: View {
     
 }
 
-
-enum ResourceSortOption {
-    case documentName
-    case documentNumber
+private struct ResourcePDFDestination {
+    let pdfKitView: PDFKitView
+    let navigationTitle: String
 }
 
 @Observable
-class ResourcesFilterModel {
+fileprivate class ResourcesListViewModel {
     
     var networkingState: NetworkingState = NetworkingState.neverCalled
     var resources: [Resource] = [] {
@@ -134,6 +146,11 @@ class ResourcesFilterModel {
         case networking
         case finished
         case error(Error)
+    }
+    
+    enum ResourceSortOption {
+        case documentName
+        case documentNumber
     }
     
     init() {
@@ -181,12 +198,6 @@ class ResourcesFilterModel {
         }catch {
             networkingState = .error(error)
         }
-    }
-    
-    
-    static func mock() -> ResourcesFilterModel {
-        let model = ResourcesFilterModel()
-        return model
     }
     
 }
