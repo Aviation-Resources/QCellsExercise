@@ -78,6 +78,7 @@ struct ResourcesListView: View {
         }
     }
     
+    @ViewBuilder
     var content: some View {
         ForEach(model.filteredResources) { resource in
             ResourceView(services: self.servicesNetworking, resource: resource) { pdfKitView, navigationTitle in
@@ -88,6 +89,14 @@ struct ResourcesListView: View {
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(.secondary.opacity(0.25), lineWidth: 1)
             }
+            .task {
+                await model.loadNextPageIfNeeded(after: resource, networkingController: graphQLNetworking)
+            }
+        }
+        
+        if model.isLoadingNextPage {
+            ProgressView()
+                .padding()
         }
     }
     
@@ -130,6 +139,10 @@ fileprivate class ResourcesListViewModel {
         }
     }
     var filteredResources: [Resource] = []
+    var isLoadingNextPage = false
+    
+    private let pageSize = 3
+    private var hasMorePages = true
     var searchText: String = "" {
         didSet {
             updateFilteredResources()
@@ -190,14 +203,46 @@ fileprivate class ResourcesListViewModel {
     
     @MainActor
     func loadSourceData(networkingController: GraphQLNetworking) async {
-        do {
-            networkingState = .networking
-            let query = DocumentsQuery()
-            resources = try await networkingController.fetch(query: query).resourceQuery.map { $0.fragments.resource }
-            networkingState = .finished
-        }catch {
-            networkingState = .error(error)
+        guard hasMorePages, !isLoadingNextPage else {
+            return
         }
+        
+        if case .networking = networkingState {
+            return
+        }
+        
+        let isInitialLoad = resources.isEmpty
+        
+        do {
+            if isInitialLoad {
+                networkingState = .networking
+            } else {
+                isLoadingNextPage = true
+            }
+            
+            let query = DocumentsQuery(limit: .some(pageSize), offset: .some(resources.count))
+            let nextPage = try await networkingController.fetch(query: query).resourceQuery.map { $0.fragments.resource }
+            resources.append(contentsOf: nextPage)
+            hasMorePages = nextPage.count == pageSize
+            networkingState = .finished
+            isLoadingNextPage = false
+        } catch {
+            if isInitialLoad {
+                networkingState = .error(error)
+            } else {
+                networkingState = .finished
+            }
+            isLoadingNextPage = false
+        }
+    }
+    
+    @MainActor
+    func loadNextPageIfNeeded(after resource: Resource, networkingController: GraphQLNetworking) async {
+        guard resource.id == filteredResources.last?.id else {
+            return
+        }
+        
+        await loadSourceData(networkingController: networkingController)
     }
     
 }

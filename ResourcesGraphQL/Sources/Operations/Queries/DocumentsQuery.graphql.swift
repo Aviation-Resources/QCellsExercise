@@ -7,11 +7,25 @@ public class DocumentsQuery: GraphQLQuery {
   public static let operationName: String = "Documents"
   public static let operationDocument: ApolloAPI.OperationDocument = .init(
     definition: .init(
-      #"query Documents { resourceQuery: resources { __typename ...Resource } }"#,
+      #"query Documents($limit: Int, $offset: Int) { resourceQuery: resources(limit: $limit, offset: $offset) { __typename ...Resource } }"#,
       fragments: [Resource.self]
     ))
 
-  public init() {}
+  public var limit: GraphQLNullable<Int>
+  public var offset: GraphQLNullable<Int>
+
+  public init(
+    limit: GraphQLNullable<Int>,
+    offset: GraphQLNullable<Int>
+  ) {
+    self.limit = limit
+    self.offset = offset
+  }
+
+  public var __variables: Variables? { [
+    "limit": limit,
+    "offset": offset
+  ] }
 
   public struct Data: ResourcesGraphQL.SelectionSet {
     public let __data: DataDict
@@ -19,7 +33,10 @@ public class DocumentsQuery: GraphQLQuery {
 
     public static var __parentType: any ApolloAPI.ParentType { ResourcesGraphQL.Objects.Query_root }
     public static var __selections: [ApolloAPI.Selection] { [
-      .field("resources", alias: "resourceQuery", [ResourceQuery].self),
+      .field("resources", alias: "resourceQuery", [ResourceQuery].self, arguments: [
+        "limit": .variable("limit"),
+        "offset": .variable("offset")
+      ]),
     ] }
 
     /// An array relationship

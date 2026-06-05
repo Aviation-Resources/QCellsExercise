@@ -1,5 +1,5 @@
-query Documents {
-  resourceQuery: resources {
+query Documents($limit: Int, $offset: Int) {
+  resourceQuery: resources(limit: $limit, offset: $offset) {
     ...Resource
   }
 }

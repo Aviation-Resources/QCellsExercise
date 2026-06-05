@@ -27,30 +27,9 @@ struct ResourceView: View {
     var body: some View {
         ZStack {
             ImageLoadingView(imageLoadingState: $imageLoadingState)
-            
             downloadStateOverlay
         }.onTapGesture {
-            switch viewModel.fileDownloadState {
-            case .finished(let p_data):
-                if let pdfData = p_data  {
-                    guard let pdfDocument = PDFDocument(data: pdfData) else {
-                        return
-                    }
-                    viewModel.pdfDocument = pdfDocument
-                }else {
-                    let cachManager = SDImageCache(namespace: "resource-images")
-                    guard let fileData = cachManager.diskImageData(forKey: resource.s3_key) else {
-                        return
-                    }
-                    guard let pdfDocument = PDFDocument(data: fileData) else {
-                        return
-                    }
-                    viewModel.pdfDocument = pdfDocument
-                }
-                onOpenPDF(viewModel.pdfKitView, resource.documentNumber)
-            default:
-                Task { await downloadFile() }
-            }
+            tapped()
         }.task {
             await loadThumbnail()
             await checkDownloadState()
@@ -95,6 +74,30 @@ struct ResourceView: View {
     }
     
     //MARK: Functions
+    
+    func tapped() {
+        switch viewModel.fileDownloadState {
+        case .finished(let p_data):
+            if let pdfData = p_data  {
+                guard let pdfDocument = PDFDocument(data: pdfData) else {
+                    return
+                }
+                viewModel.pdfDocument = pdfDocument
+            }else {
+                let cachManager = SDImageCache(namespace: "resource-images")
+                guard let fileData = cachManager.diskImageData(forKey: resource.s3_key) else {
+                    return
+                }
+                guard let pdfDocument = PDFDocument(data: fileData) else {
+                    return
+                }
+                viewModel.pdfDocument = pdfDocument
+            }
+            onOpenPDF(viewModel.pdfKitView, resource.documentNumber)
+        default:
+            Task { await downloadFile() }
+        }
+    }
     
     func loadThumbnail() async {
         do {
